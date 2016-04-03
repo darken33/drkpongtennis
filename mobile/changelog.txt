@@ -1,2 +1,5 @@
+* v1.0.1
+- There was a bug when the player 2 (the computer) win : wrong text
+
 * v1.0
 - First release of drkPongTennis
