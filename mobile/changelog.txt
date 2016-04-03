@@ -1,3 +1,6 @@
+* v1.0.2
+- There was a shift bug on game initialization when the screen is larger than height
+
 * v1.0.1
 - There was a bug when the player 2 (the computer) win : wrong text
 
