@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>drkPongTennis v1.0</title>
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+	 	<link rel="stylesheet" href="jquery.mobile/jquery.mobile-1.1.0.min.css" />
+		<link rel="stylesheet" href="index.css" /> 
+	    <script src="jquery.mobile/jquery-1.6.4.min.js"></script>
+		<script src="jquery.mobile/jquery.mobile-1.1.0.min.js"></script>
+		<script type="text/javascript" charset="utf-8" src="phonegap.0.9.6.min.js"></script> 
+		<script type="text/javascript" charset="utf-8" src="index.js"></script>
+    </head>	
+	<body style="text-align: center;" data-theme="a">
+		
+		<!-- page d'accueil -->
+		<div data-role="page" data-theme="a" id="menu">
+			<div data-role="content" style="text-align:center">
+				<img id="title_img" src="images/title_screen.png" />
+				<ul data-role="listview"  data-divider-theme="b" data-inset="true" >
+					<li data-theme="b" data-icon="plus">
+						PLAY
+						<ul data-role="listview" data-theme="a" data-inset="true">
+							<li data-theme="b" data-icon="star">
+								<a href="#game" onclick="init(1)">EASY</a>
+							</li>
+							<li data-theme="b" data-icon="star">
+								<a href="#game" onclick="init(2)">AVERAGE</a>
+							</li>
+							<li data-theme="b" data-icon="star">
+								<a href="#game" onclick="init(3)">HARD</a>
+							</li>
+							<li data-theme="b" data-icon="back">
+								<a href="#menu">BACK</a>
+							</li>
+						</ul>
+					</li>
+					<li data-theme="b" data-icon="info">
+						<a href="#help">HELP</a>
+					</li>
+					<li data-theme="b" data-icon="info">
+						<a href="#about">ABOUT</a>
+					</li>
+					<li data-theme="b" data-icon="delete">
+						<a onclick="navigator.app.exitApp();">QUIT</a>
+					</li>
+				</ul>	
+			</div>	
+		</div>
+		
+		<!-- page du jeu -->
+		<div data-role="page" data-theme="a" id="game">
+			<div id='conteneur' data-role="content" style="text-align: center; padding-top: 10px;">
+				<canvas id="myCanvas" width="180" height="270" style="border:1px solid #c3c3c3; background: url(images/tennis_back.png);">
+					Your browser does not support the canvas element.
+				</canvas>
+				<div id="pad_left" style="position: fixed; bottom: 0; left: 0; width: 50%; height: 100%"></div>
+				<div id="pad_right" style="position: fixed; bottom: 0; right: 0; width: 50%; height: 100%"></div>
+			</div>
+		</div>
+				
+		<!-- page d'aide -->
+		<div data-role="page" data-theme="a" id="help">
+			<div id='conteneur' data-role="content" style="text-align: center; padding-top: 10px;">
+				<a href="#menu"><img id="help_img" src="images/help.png" width="200" height="300"; /></a> 
+			</div>
+		</div>
+
+		<!-- page d'aide -->
+		<div data-role="page" data-theme="a" id="about">
+			<div data-role="content" style="text-align:left" onclick="$.mobile.changePage('#menu', 'fade', true, true);">
+				<img id="about_img" src="images/title_screen.png" /><br/>
+				<strong>drkPongTennis v1.0</strong><br/>
+				By Philippe Bousquet.<br/>
+				&lt;darken33@free.fr&gt;<br/>
+				<a href="http://darken33.free.fr/">http://darken33.free.fr/</a><br/>
+				<br/>
+				This game is a free software under the Gnu GPL v3 License.
+			</div>	
+		</div>
+
+		<script type="text/javascript"> 
+		// Le background du jeu
+		var COURT = new Image();
+		// L'image du joueur 1
+		var PLAYER1_IMG = new Image();
+		// L'image du joueur 2
+		var PLAYER2_IMG = new Image();
+		// Le tableau des scores
+		var SETS = new Array(); 
+		// Le contexte 2D
+		var CONTEXT;
+		var CONTEXT_WIDTH = 180; 
+		var CONTEXT_HEIGHT = 270;
+		var CONTEXT_ROTATE = false; 
+		var CONTEXT_SCALE = 1;
+		// Thread du jeu
+		var THREAD;
+		// Indique si le jeu est chargé 
+		var LOADED = 0;
+		// Taille de l'ecran
+		var SCREEN_WIDTH = $(window).width(); 
+		var SCREEN_HEIGHT = $(window).height(); 
+		// Taille de la zone de jeu 
+		var GAME_ZONE_WIDTH = 180;
+		var GAME_ZONE_HEIGHT = 270;
+		// Positionnement de l'affichage du score
+		var SCORE_POSITION_X0 = 5;
+		var SCORE_POSITION_Y0 = 10;
+		// Valeurs communes pour les 2 joueurs
+		var PLAYER_WIDTH = 29;
+		var PLAYER_HEIGHT = 11;
+		var PLAYER_SPEED = Math.floor(GAME_ZONE_WIDTH * 0.02);
+		// Les informations du Joueur 1
+		var PLAYER1_SERVICE = true; 
+		var PLAYER1_DIRECTION = 0;
+		var PLAYER1_COLOR = "#00FF00";
+		var PLAYER1_X = (GAME_ZONE_WIDTH / 2) - (PLAYER_WIDTH/2);
+		var PLAYER1_Y = (GAME_ZONE_HEIGHT - PLAYER_HEIGHT);
+		var PLAYER1_SCORE = 0
+		var PLAYER1_SET = 0
+		// Les informations du Joueur 2
+		var PLAYER2_DIRECTION = 0;
+		var PLAYER2_COLOR = "#FF0000";
+		var PLAYER2_SCORE = 0
+		var PLAYER2_SET = 0
+		var PLAYER2_X = (GAME_ZONE_WIDTH / 2) - (PLAYER_WIDTH/2);
+		var PLAYER2_Y = 0
+		var PLAYER2_COUP;
+		var PLAYER2_SERVICE;
+		// Valeurs pour la balle
+		var BALL_DIMENSION = 3;
+		var BALL_SPEED_FACTOR = 1;
+		var BALL_SPEED = 0;
+		var BALL_COLOR = "#FFFF00";	
+		var BALL_DIRECTION_X = 1;
+		var BALL_DIRECTION_Y = -1;
+		var BALL_X = Math.floor(GAME_ZONE_WIDTH / 2);
+		var BALL_Y = GAME_ZONE_HEIGHT - PLAYER_HEIGHT - BALL_DIMENSION - 1;
+		var BALL_X_PREV = BALL_X;
+		var BALL_Y_PREV = BALL_Y;
+		// Difficulté du jeu	
+		var DIFFICULTY = 1;
+
+		/**
+	 	 * les évènements sur l'écran tactile
+		 */
+		jQuery(document).ready(function(){
+			$('#pad_left').bind('vmousedown', function(e){
+				e.preventDefault();
+				PLAYER1_DIRECTION = -1;
+				e.stopPropagation();
+			}); 
+			$('#pad_left').bind('vmouseup', function(e){
+				e.preventDefault();
+				PLAYER1_DIRECTION = 0;
+				e.stopPropagation();
+			}); 
+			$('#pad_right').bind('vmousedown', function(e){
+				e.preventDefault();
+				PLAYER1_DIRECTION = 1;
+				e.stopPropagation();
+			}); 
+			$('#pad_right').bind('vmouseup', function(e){
+				e.preventDefault();
+				PLAYER1_DIRECTION = 0;
+				e.stopPropagation();
+			}); 
+			if (SCREEN_WIDTH > 400) {
+				document.getElementById('title_img').width = 320;
+				document.getElementById('title_img').height = 240;
+				document.getElementById('about_img').width = 320;
+				document.getElementById('about_img').height = 240;
+			}
+			else {
+				document.getElementById('title_img').width = 160;
+				document.getElementById('title_img').height = 120;
+				document.getElementById('about_img').width = 160;
+				document.getElementById('about_img').height = 120;
+			}
+			if (SCREEN_HEIGHT > 540) {
+				document.getElementById('help_img').width = 360;
+				document.getElementById('help_img').height = 540;
+			}
+			else {
+				document.getElementById('help_img').width = 180;
+				document.getElementById('help_img').height = 270;
+			}
+			document.addEventListener("deviceready", onDeviceReady, true);
+		})	
+
+		/**
+		 * init : initialisation du jeu
+		 */
+		function init(dif) {
+			DIFFICULTY = dif;
+			// Le background du jeu
+			COURT.src = "images/tennis_back.png";
+			COURT.onload = function(){ LOADED++; };
+			// L'image du joueur 1
+			PLAYER1_IMG.src="images/player1.png";
+			PLAYER1_IMG.onload = function(){ LOADED++; };
+			// L'image du joueur 2
+			PLAYER2_IMG.src="images/player2.png";
+			PLAYER2_IMG.onload = function(){ LOADED++; };
+			// Le contexte 2D
+			var elem = document.getElementById('myCanvas');
+			if ((SCREEN_WIDTH > 360 && SCREEN_HEIGHT > 540) || (SCREEN_WIDTH > 360 && SCREEN_HEIGHT > 540)) {
+				CONTEXT_WIDTH = 360;
+				CONTEXT_HEIGHT = 540;
+				CONTEXT_SCALE = 2;
+			}
+			else {
+				CONTEXT_WIDTH = 180;
+				CONTEXT_HEIGHT = 270;
+				CONTEXT_SCALE = 1;
+			}
+			if (SCREEN_WIDTH > SCREEN_HEIGHT) {
+				elem.width = CONTEXT_HEIGHT;
+				elem.height = CONTEXT_WIDTH;
+				CONTEXT_ROTATE = true;
+			}
+			else {
+				elem.width = CONTEXT_WIDTH;
+				elem.height = CONTEXT_HEIGHT;
+			}
+			if (!elem || !elem.getContext) {
+				return;
+			}
+			CONTEXT = elem.getContext('2d');
+			if (!CONTEXT) {
+				return;
+			}
+			CONTEXT.scale(CONTEXT_SCALE,CONTEXT_SCALE);
+			if (CONTEXT_ROTATE) {
+				CONTEXT.translate(300, 0);
+				CONTEXT.rotate(90*Math.PI/180);
+			}
+			SETS = new Array(); 
+			// Les informations du Joueur 1
+			PLAYER1_SERVICE = true; 
+			PLAYER1_DIRECTION = 0;
+			PLAYER1_X = (GAME_ZONE_WIDTH / 2) - (PLAYER_WIDTH/2);
+			PLAYER1_Y = (GAME_ZONE_HEIGHT - PLAYER_HEIGHT);
+			PLAYER1_SCORE = 0
+			PLAYER1_SET = 0
+			// Les informations du Joueur 2
+			PLAYER2_DIRECTION = 0;
+			PLAYER2_SCORE = 0
+			PLAYER2_SET = 0
+			PLAYER2_X = (GAME_ZONE_WIDTH / 2) - (PLAYER_WIDTH/2);
+			PLAYER2_Y = 0
+			// Valeurs pour la balle
+			BALL_SPEED = 0;
+			BALL_DIRECTION_X = 1;
+			BALL_DIRECTION_Y = -1;
+			BALL_X = Math.floor(GAME_ZONE_WIDTH / 2);
+			BALL_Y = GAME_ZONE_HEIGHT - PLAYER_HEIGHT - BALL_DIMENSION - 1;
+			BALL_X_PREV = BALL_X;
+			BALL_Y_PREV = BALL_Y;
+			// On position un listenre sur le clavier et on charge le jeu
+			window.document.onkeydown = keyboard_entry;
+			THREAD = setInterval(loading, 15);
+		}
+		
+		/**
+		 * loading : fonction de chargement du jeu
+		 */
+		function loading() {
+			if (LOADED == 3) {
+				clearInterval(THREAD);
+				select_smash();
+				THREAD = setInterval(refreshGame, 15);
+			}
+		}
+
+		/** rotate_screen : permet de gérer les rotations d'écran 
+		 *
+		 */ 
+		function rotate_screen() {
+			SCREEN_WIDTH = $(window).width(); 
+			SCREEN_HEIGHT = $(window).height(); 
+			if (SCREEN_WIDTH > SCREEN_HEIGHT && !CONTEXT_ROTATE) {
+				elem = document.getElementById('myCanvas');
+				elem.width = CONTEXT_HEIGHT;
+				elem.height = CONTEXT_WIDTH;
+				CONTEXT_ROTATE = true;
+				if (!elem || !elem.getContext) {
+					return;
+				}
+				CONTEXT = elem.getContext('2d');
+				if (!CONTEXT) {
+					return;
+				}
+				CONTEXT.scale(CONTEXT_SCALE,CONTEXT_SCALE);
+				if (CONTEXT_ROTATE) {
+					CONTEXT.translate(270, 0);
+					CONTEXT.rotate(90*Math.PI/180);
+				}
+			}
+			else if (SCREEN_HEIGHT > SCREEN_WIDTH && CONTEXT_ROTATE) {
+				elem = document.getElementById('myCanvas');
+				elem.width = CONTEXT_WIDTH;
+				elem.height = CONTEXT_HEIGHT;
+				CONTEXT_ROTATE = false;
+				if (!elem || !elem.getContext) {
+					return;
+				}
+				CONTEXT = elem.getContext('2d');
+				if (!CONTEXT) {
+					return;
+				}
+				CONTEXT.scale(CONTEXT_SCALE,CONTEXT_SCALE);
+			}
+		}
+		
+		/**
+		 * refreshGame : boucle du jeu + affichage
+		 */	
+		function refreshGame() {
+			rotate_screen();
+			// On efface la zone
+			CONTEXT.clearRect(0, GAME_ZONE_WIDTH, 0, GAME_ZONE_HEIGHT);
+			// On affiche le court
+			CONTEXT.drawImage(COURT, 0, 0);
+
+			// On affiche les joueurs
+			CONTEXT.drawImage(PLAYER1_IMG, PLAYER1_X, PLAYER1_Y);
+			CONTEXT.drawImage(PLAYER2_IMG, PLAYER2_X, PLAYER2_Y);
+
+			update_ball();
+
+			BALL_X_PREV = BALL_X;
+			BALL_Y_PREV = BALL_Y;
+			BALL_X += BALL_DIRECTION_X * BALL_SPEED;
+			BALL_Y += BALL_DIRECTION_Y * BALL_SPEED;
+		
+			// On affiche la balle
+			CONTEXT.fillStyle=BALL_COLOR;
+			CONTEXT.beginPath();
+			CONTEXT.arc(BALL_X, BALL_Y, BALL_DIMENSION, 0, Math.PI*2, true);
+			CONTEXT.closePath();
+			CONTEXT.fill();
+
+			// On affiche le score
+			CONTEXT.fillStyle="#000000";
+			CONTEXT.font="9px Arial";
+			y_txt = SCORE_POSITION_Y0;
+			x_txt = SCORE_POSITION_X0;
+			if (CONTEXT_ROTATE) {
+				CONTEXT.rotate(-90*Math.PI/180);
+				CONTEXT.translate(-270, 0);
+			}
+			for (i=0; i<SETS.length; i++) {  
+				CONTEXT.fillText(SETS[i][0],x_txt,y_txt); 
+				CONTEXT.fillText(SETS[i][1],x_txt,y_txt+9);
+				x_txt+=5; 
+			}
+			if (!(PLAYER1_SET == 3 || PLAYER2_SET == 3)) {
+				CONTEXT.fillText(PLAYER1_SCORE,x_txt,y_txt); 
+				CONTEXT.fillText(PLAYER2_SCORE,x_txt,y_txt+9);
+			}	
+			if (CONTEXT_ROTATE) {
+				CONTEXT.translate(270, 0);
+				CONTEXT.rotate(90*Math.PI/180);
+			}
+			update_player1();	
+			update_player2();	
+		}
+	
+		/**
+		 * update_ball : gestion du déplacemet de la balle
+		 */
+		function update_ball() {
+			if ( (BALL_X + BALL_DIRECTION_X * BALL_SPEED) >  GAME_ZONE_WIDTH || (BALL_X + BALL_DIRECTION_X * BALL_SPEED) <  0) {
+				BALL_DIRECTION_X = -1*BALL_DIRECTION_X;
+			}
+			if ( (BALL_Y + BALL_DIRECTION_Y * BALL_SPEED) >  GAME_ZONE_HEIGHT) {
+				update_score(2);
+			}
+			else {
+				if ( (BALL_Y + BALL_DIRECTION_Y * BALL_SPEED) <  0) {
+					update_score(1);
+				}	
+				else {
+					if ( ((BALL_Y + BALL_DIRECTION_Y * BALL_SPEED) > PLAYER1_Y) && ((BALL_X + BALL_DIRECTION_X * BALL_SPEED) >= PLAYER1_X) && ((BALL_X + BALL_DIRECTION_X * BALL_SPEED) <= (PLAYER1_X+PLAYER_WIDTH))) {
+						BALL_DIRECTION_Y = -1;
+						BALL_DIRECTION_X = 2*(BALL_X-(PLAYER1_X+PLAYER_WIDTH/2))/PLAYER_WIDTH;
+						if (DIFFICULTY == 1 && BALL_SPEED < 4) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+						else if (DIFFICULTY == 2 && BALL_SPEED < 6) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+						else if (DIFFICULTY == 3 && BALL_SPEED < 8) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+					}
+					else {
+						if ( ((BALL_Y + BALL_DIRECTION_Y * BALL_SPEED) < PLAYER2_Y + PLAYER_HEIGHT) && ((BALL_X + BALL_DIRECTION_X * BALL_SPEED) >= PLAYER2_X) && ((BALL_X + BALL_DIRECTION_X * BALL_SPEED) <= (PLAYER2_X+PLAYER_WIDTH))) {
+							BALL_DIRECTION_Y = 1;
+							BALL_DIRECTION_X = 2*(BALL_X-(PLAYER2_X+PLAYER_WIDTH/2))/PLAYER_WIDTH;
+							if (DIFFICULTY == 1 && BALL_SPEED < 4) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+							else if (DIFFICULTY == 2 && BALL_SPEED < 6) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+							else if (DIFFICULTY == 3 && BALL_SPEED < 8) BALL_SPEED+=(0.5 * BALL_SPEED_FACTOR);
+							select_smash();
+						}
+					}
+				}
+			}
+		}
+	
+		/**
+		 * update_score : on met à jour le tableau des scores
+		 */
+		function update_score(player) {
+			clearInterval(THREAD);
+			navigator.notification.vibrate(0);
+			BALL_SPEED = 0;
+			PLAYER1_SERVICE = !PLAYER1_SERVICE;
+			message="";
+			if (player == 1) {
+				PLAYER1_SCORE++;
+				message = "POINT PLAYER 1";
+			}
+			else {
+				PLAYER2_SCORE++;
+				message = "POINT PLAYER 2";
+			}
+			if ((PLAYER1_SCORE == 6 && PLAYER1_SCORE - PLAYER2_SCORE > 1) || PLAYER1_SCORE == 7) {
+				PLAYER1_SET++
+				set = new Array();
+				set[0]=PLAYER1_SCORE;
+				set[1]=PLAYER2_SCORE;
+				SETS[SETS.length]=set;
+				PLAYER1_SCORE=0;
+				PLAYER2_SCORE=0;
+				message = "SET PLAYER 1";	
+			}
+			if ((PLAYER2_SCORE == 6 && PLAYER2_SCORE - PLAYER1_SCORE > 1) || PLAYER2_SCORE == 7) {
+				PLAYER2_SET++
+				set = new Array();
+				set[0]=PLAYER1_SCORE;
+				set[1]=PLAYER2_SCORE;
+				SETS[SETS.length]=set;
+				PLAYER1_SCORE=0;
+				PLAYER2_SCORE=0;
+				message = "SET PLAYER 2";	
+			}
+			if (PLAYER1_SERVICE) {
+				if (PLAYER1_X < 0) PLAYER1_X = 0;
+				if (PLAYER1_X + PLAYER_WIDTH > GAME_ZONE_WIDTH) PLAYER1_X = GAME_ZONE_WIDTH - PLAYER_WIDTH;
+				BALL_DIRECTION_X = 1;
+				BALL_DIRECTION_Y = -1;
+				BALL_X = Math.floor(PLAYER1_X + PLAYER_WIDTH / 2); 
+				BALL_Y = GAME_ZONE_HEIGHT - PLAYER_HEIGHT - BALL_DIMENSION - 1;
+				BALL_X_PREV = BALL_X;
+				BALL_Y_PREV = BALL_Y;
+			} 
+			else {
+				if (PLAYER2_X < 0) PLAYER2_X = 0;
+				if (PLAYER2_X + PLAYER_WIDTH > GAME_ZONE_WIDTH) PLAYER2_X = GAME_ZONE_WIDTH - PLAYER_WIDTH;
+				BALL_DIRECTION_X = -1;
+				BALL_DIRECTION_Y = 1;
+				BALL_X = Math.floor(PLAYER2_X + PLAYER_WIDTH / 2); 
+				BALL_Y = PLAYER_HEIGHT + BALL_DIMENSION + 1;
+				BALL_X_PREV = BALL_X;
+				BALL_Y_PREV = BALL_Y;
+			}
+			if (PLAYER1_SET == 3) {
+				message = "MATCH PLAYER 1";	
+			}
+			else if (PLAYER2_SET == 3) {
+				clearInterval(THREAD);
+			}
+			CONTEXT.fillStyle="#CC00FF";
+			CONTEXT.font="Bold 20px Arial";
+			if (CONTEXT_ROTATE) {
+				CONTEXT.rotate(-90*Math.PI/180);
+				CONTEXT.translate(-240, -50);
+			}
+			CONTEXT.fillText(message, 15, 140); 
+			if (PLAYER1_SET == 3 || PLAYER2_SET == 3) {
+				xf = 15;
+				for (i=0; i<SETS.length; i++) {  
+					CONTEXT.fillText(SETS[i][0],xf,170); 
+					CONTEXT.fillText(SETS[i][1],xf,170+22);
+					xf+=15; 
+				}
+			}
+			else {
+				THREAD = setInterval(serveGame, 1000);
+				if (! PLAYER1_SERVICE)	PLAYER2_SERVICE=setInterval(player2_service, 1500);
+			}
+			if (CONTEXT_ROTATE) {
+				CONTEXT.translate(240, 50);
+				CONTEXT.rotate(90*Math.PI/180);
+			}
+		}
+
+		/**
+		 * serveGame : on reprend le jeu
+		 */
+		function serveGame() {
+			clearInterval(THREAD);
+			THREAD = setInterval(refreshGame, 15);
+		}
+	 	
+		/**
+		 * player2_service : on joue le service du joueur 2
+		 */
+		function player2_service() {
+			clearInterval(PLAYER2_SERVICE);
+			BALL_SPEED = 1;
+		}
+	
+		/**
+		 * select_smash : eterminer le coup à jouer pour le joueur 2
+		 */
+		function select_smash() {
+			coup = Math.floor(Math.random()*100);
+			if (DIFFICULTY < 3) {
+				// 15 %
+				if (coup < 15) {
+					PLAYER2_COUP = 0;
+				} 
+				// 30 %
+				else if (coup < 45) {
+					PLAYER2_COUP = 1;
+				}
+				// 10 %
+				else if (coup < 55) {
+					PLAYER2_COUP = 2;
+				}
+				// 30 %
+				else if (coup < 85) {
+					PLAYER2_COUP = 3;
+				}
+				// 15 % 
+				else {
+					PLAYER2_COUP = 4;
+				}
+			}
+			else {
+				// 25 %
+				if (coup < 25) {
+					PLAYER2_COUP = 0;
+				} 
+				// 20 %
+				else if (coup < 45) {
+					PLAYER2_COUP = 1;
+				}
+				// 10 %
+				else if (coup < 55) {
+					PLAYER2_COUP = 2;
+				}
+				// 20 %
+				else if (coup < 75) {
+					PLAYER2_COUP = 3;
+				}
+				// 25 % 
+				else {
+					PLAYER2_COUP = 4;
+				}
+			}
+		}
+	
+		/**
+		 * update_player2 : fonction qui gère les déplacement du joueur 2
+		 */ 		
+		function update_player2() {
+			// On choisi le coup a jouer
+			if (PLAYER2_COUP == 0) x = PLAYER2_X + 1;
+			else if (PLAYER2_COUP == 1) x = PLAYER2_X + PLAYER_WIDTH / 4 + 1;
+			else if (PLAYER2_COUP == 2) x = PLAYER2_X + PLAYER_WIDTH / 2;
+			else if (PLAYER2_COUP == 3) x = PLAYER2_X +  (3 * PLAYER_WIDTH) / 4 - 1;
+			else if (PLAYER2_COUP == 4) x = PLAYER2_X + PLAYER_WIDTH -1;
+			// En niveau facile il réagit des que la balle est au retour 1/2
+			if (DIFFICULTY == 1) {
+				if (BALL_DIRECTION_Y == -1 && BALL_Y < (2 * GAME_ZONE_HEIGHT / 4)) {
+					if (x < BALL_X) {
+						PLAYER2_X += Math.floor(3 * PLAYER_SPEED / 4);
+					}
+					else if (x > BALL_X) {
+						PLAYER2_X -= Math.floor(3 * PLAYER_SPEED / 4);
+					}
+				}
+			}
+			// Pour le niveau moyen il réagit des que la balle est au retour 1/4
+			else if (DIFFICULTY == 2) {
+				if (BALL_DIRECTION_Y == -1 && BALL_Y < (3 * GAME_ZONE_HEIGHT / 4)) {
+					if (x < BALL_X) {
+						PLAYER2_X += Math.floor(3 * PLAYER_SPEED / 4);
+					}
+					else if (x > BALL_X) {
+						PLAYER2_X -= Math.floor(3 * PLAYER_SPEED / 4);
+					}
+				}
+			}
+			// Pour le niveau difficile il réagit des que la balle est au retour
+			else {
+				if (BALL_DIRECTION_Y == -1) {
+					if (x < BALL_X) {
+						PLAYER2_X += PLAYER_SPEED;
+					}
+					else if (x > BALL_X) {
+						PLAYER2_X -= PLAYER_SPEED;
+					}
+				}
+			}
+		}
+	
+		/**
+		 * update_player1 : mise à jour du joueur 1;
+		 */
+		function update_player1 () {
+			if (BALL_SPEED == 0 && PLAYER1_SERVICE) {
+				if ((PLAYER1_X-PLAYER_SPEED >= 0 && PLAYER1_DIRECTION == -1) || 
+					((PLAYER1_X+PLAYER_SPEED+PLAYER_WIDTH) <= GAME_ZONE_WIDTH && PLAYER1_DIRECTION == 1)) {
+					PLAYER1_X += PLAYER1_DIRECTION * PLAYER_SPEED;
+					BALL_X += PLAYER1_DIRECTION * PLAYER_SPEED;
+				}
+			}
+			else {
+				if ((PLAYER1_X-PLAYER_SPEED+PLAYER_WIDTH >= 0 && PLAYER1_DIRECTION == -1) || 
+					((PLAYER1_X+PLAYER_SPEED) <= GAME_ZONE_WIDTH && PLAYER1_DIRECTION == 1)) {
+					PLAYER1_X += PLAYER1_DIRECTION * PLAYER_SPEED;
+				}
+			}
+		}
+	
+		/**
+		 * keyboard_entry : gestion du clavier pour le joueur 1
+		 */
+		function keyboard_entry(e) {
+			// Flêche de droite préssée
+			if (e.keyCode == 39) {
+				if (BALL_SPEED == 0 && PLAYER1_SERVICE) {
+					if ( (PLAYER1_X+PLAYER_SPEED+PLAYER_WIDTH) <= GAME_ZONE_WIDTH ) {
+						PLAYER1_X += PLAYER_SPEED;
+						BALL_X += PLAYER_SPEED;
+					}
+				}
+				else if ( (PLAYER1_X+PLAYER_SPEED) <= GAME_ZONE_WIDTH ) {
+					PLAYER1_X += PLAYER_SPEED;
+				}
+			}
+			// Flêche de gauche préssée
+			else if (e.keyCode == 37) {
+				if (BALL_SPEED == 0 && PLAYER1_SERVICE) {
+					if ( PLAYER1_X-PLAYER_SPEED >= 0 ) {
+						PLAYER1_X -= PLAYER_SPEED;
+						BALL_X -= PLAYER_SPEED;
+					}
+				}
+				else if ( PLAYER1_X-PLAYER_SPEED+PLAYER_WIDTH >= 0 ) {
+					PLAYER1_X -= PLAYER_SPEED;
+				}
+			}
+			// Flêche haut préssée
+			else if (e.keyCode == 38) {
+				if ( BALL_SPEED == 0 ) {
+					BALL_SPEED = 1;
+				}
+			}
+		}	
+
+		/**
+		 * onMenubutton - evenement sur le bouton home 
+		 */
+		function onMenuButton() {
+			// en jeu on relache la balle
+			if ($('#game').css('display') == 'block') {
+				if (BALL_SPEED == 0 && PLAYER1_SERVICE) BALL_SPEED = 1;
+			} 
+			// sur les autre ecran on retourne sur le menu
+			else {
+				$.mobile.changePage('#menu', 'fade', true, true);
+			} 
+		}
+
+		/**
+		 * fonction de gestion des boutons de la boite de confirmation
+		 */
+		function onConfirm(button) {
+			if (button == 1) {
+				$.mobile.changePage('#menu', 'fade', true, true);
+			}
+			else {
+				THREAD = setInterval(refreshGame, 15);
+			}
+		}
+
+		/**
+		 * onBackbutton - evenement sur le bouton retour 
+		 */
+		function onBackButton() {
+			// sur le menu on quitte l'application
+			if ($('#menu').css('display') == 'block') {
+				navigator.app.exitApp();
+			}
+			// pendant le jeu on demande si on veut quitter le jeu
+			else if ($('#game').css('display') == 'block') {
+				clearInterval(THREAD);
+				if (PLAYER1_SET == 3 || PLAYER2_SET == 3) {
+					$.mobile.changePage('#menu', 'fade', true, true);
+				}
+				else {
+					navigator.notification.confirm(
+					'Voulez vous quitter le jeu ?',  // message
+					onConfirm,              // callback to invoke with index of button pressed
+					'Sortir',            // title
+					'Oui,Non'          // buttonLabels
+					);
+				}    
+			}
+			// sinon on revient sur le menu
+			else {
+				$.mobile.changePage('#menu', 'fade', true, true);
+			}
+		}
+		
+		/**
+		 * onDeviceReady - mise en place des listeners
+		 */
+		var onDeviceReady = function() {
+			document.addEventListener("backbutton", onBackButton, true);
+			document.addEventListener("menubutton", onMenuButton, true);
+		};		
+		</script>
+	</body>
+</html>
+
+
